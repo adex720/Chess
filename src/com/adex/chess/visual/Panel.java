@@ -297,7 +297,7 @@ public class Panel extends JPanel {
         g.setFont(font);
         g.setColor(Color.black);
 
-        String[] texts = {/*"SINGLE PLAYER"*/"PLAY", "MULTI PLAYER", "SETTINGS", "HELP", "QUIT"}; //TODO: ADD SINGLE PLAYER
+        String[] texts = {"SINGLE PLAYER", "MULTI PLAYER", "SETTINGS", "HELP", "QUIT"};
 
         for (String text : texts) {
             g.fillRect(startX, y, width, height);
