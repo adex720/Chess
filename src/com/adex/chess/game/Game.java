@@ -44,6 +44,8 @@ public class Game {
 
     private Timer timer;
 
+    private final AI ai;
+
     public Game(Settings settings, boolean multiPlayer) {
         units = new ArrayList<>();
         this.multiPlayer = multiPlayer;
@@ -72,6 +74,9 @@ public class Game {
             timeLeftBlack = settings.getTime() * 60;
             startTimer();
         }
+
+        if (multiPlayer) ai = null;
+        else ai = new AI();
     }
 
     /*public Game(int undos) {
@@ -434,37 +439,41 @@ public class Game {
 
     public void changeTurn() {
 
-        //is king at checkmate
-        boolean canMove = true;
+        if (multiPlayer) {
+            //is king at checkmate
+            boolean canMove = true;
 
-        Unit king = getKing(!whitesTurn);
-        int[] x = {-1, 0, 1, -1, 1, -1, 0, 1};
-        int[] y = {1, 1, 1, 0, 0, -1, -1, -1};
-        for (int i = 0; i < 8; i++) {
-            Position endPos = king.getPosition().add(x[i], y[i]);
-            if (isOnBoard(endPos)) continue;
+            Unit king = getKing(!whitesTurn);
+            int[] x = {-1, 0, 1, -1, 1, -1, 0, 1};
+            int[] y = {1, 1, 1, 0, 0, -1, -1, -1};
+            for (int i = 0; i < 8; i++) {
+                Position endPos = king.getPosition().add(x[i], y[i]);
+                if (isOnBoard(endPos)) continue;
 
-            if (!isUnitAtRisk(king, endPos)) {
-                if (hasUnitIn(endPos))
-                    if (getUnitOnPosition(endPos).isWhite() == king.isWhite()) continue;
-                canMove = false;
-            }
-        }
-
-        if (canMove && selected != null) { // fixing npe when undoing
-            if (isUnitAtRisk(king)) {
-                gameOver = true;
-                isWhiteWinner = whitesTurn;
-                stopTimer();
-            } else {
-                if (getUnits(!selected.isWhite()).size() == 1) { //stalemate
-                    gameOver = true;
-                    stopTimer();
+                if (!isUnitAtRisk(king, endPos)) {
+                    if (hasUnitIn(endPos))
+                        if (getUnitOnPosition(endPos).isWhite() == king.isWhite()) continue;
+                    canMove = false;
                 }
             }
-        }
 
-        whitesTurn = !whitesTurn;
+            if (canMove && selected != null) { // fixing npe when undoing
+                if (isUnitAtRisk(king)) {
+                    gameOver = true;
+                    isWhiteWinner = whitesTurn;
+                    stopTimer();
+                } else {
+                    if (getUnits(!selected.isWhite()).size() == 1) { //stalemate
+                        gameOver = true;
+                        stopTimer();
+                    }
+                }
+            }
+
+            whitesTurn = !whitesTurn;
+        } else {
+            ai.makeMove(this);
+        }
         selected = null;
         Chess.WINDOW.repaint();
     }
