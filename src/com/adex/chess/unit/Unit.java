@@ -68,6 +68,7 @@ public abstract class Unit {
 
     public boolean canMove(Position startPos, Position endPos, Game game) {
         if (endPos.getX() < 0 || endPos.getX() > 7 || endPos.getY() < 0 || endPos.getY() > 7) return false; //You can't move outside of the board.
+        if (startPos.equals(endPos)) return false; // You can't move where you are.
 
         if (game.hasUnitIn(endPos))
             if (game.getUnitOnPosition(endPos).isWhite() == game.getUnitOnPosition(startPos).isWhite()) return false; //You can't move somewhere where already is your unit.
