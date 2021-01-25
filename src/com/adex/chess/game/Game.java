@@ -28,8 +28,8 @@ public class Game {
     private int undosWhite;
     private int undosBlack;
 
-    private final ArrayList<Unit> eatenWhite;
-    private final ArrayList<Unit> eatenBlack;
+    private final ArrayList<Unit> capturedWhite;
+    private final ArrayList<Unit> capturedBlack;
 
     private Unit chosen;
     private Pawn updating;
@@ -44,7 +44,7 @@ public class Game {
 
     private Timer timer;
 
-    private final AI ai;
+    private final AI aI;
 
     public Game(Settings settings, boolean multiPlayer) {
         units = new ArrayList<>();
@@ -57,15 +57,15 @@ public class Game {
 
         undosWhite = settings.getUndos();
         undosBlack = settings.getUndos();
-        eatenWhite = new ArrayList<>();
-        eatenBlack = new ArrayList<>();
+        capturedWhite = new ArrayList<>();
+        capturedBlack = new ArrayList<>();
 
         cacheUnits = new ArrayList<>();
 
         chosen = null;
         updating = null;
 
-        usingTimer = settings.getTime() != 0;
+        usingTimer = settings.hasTime();
         if (!usingTimer) {
             timeLeftWhite = 0;
             timeLeftBlack = 0;
@@ -75,8 +75,8 @@ public class Game {
             startTimer();
         }
 
-        if (multiPlayer) ai = null;
-        else ai = new AI();
+        if (multiPlayer) aI = null;
+        else aI = new AI();
     }
 
     /*public Game(int undos) {
@@ -89,8 +89,8 @@ public class Game {
 
         undosWhite = undos;
         undosBlack = undos;
-        eatenWhite = new ArrayList<>();
-        eatenBlack = new ArrayList<>();
+        capturedWhite = new ArrayList<>();
+        capturedBlack = new ArrayList<>();
 
         cacheUnits = new ArrayList<>();
 
@@ -257,44 +257,48 @@ public class Game {
     }
 
     private void reduceSecond() {
+        System.out.println(2);
         if (whitesTurn) {
             timeLeftWhite--;
             if (timeLeftWhite == 0) {
                 gameOver = true;
                 isWhiteWinner = false;
-                stopTimer();
+                if (usingTimer) stopTimer();
             }
         } else {
             timeLeftBlack--;
             if (timeLeftBlack == 0) {
                 gameOver = true;
                 isWhiteWinner = true;
-                stopTimer();
+                if (usingTimer) stopTimer();
             }
         }
 
         Chess.WINDOW.repaint();
     }
 
-    public void removeEaten(Unit lastEaten) {
-        if (lastEaten.isWhite()) eatenWhite.remove(lastEaten);
-        else eatenBlack.remove(lastEaten);
+    public void removeCaptured(Unit lastCaptured) {
+        if (lastCaptured.isWhite()) capturedWhite.remove(lastCaptured);
+        else capturedBlack.remove(lastCaptured);
     }
 
     public boolean isUnitAtRisk(Unit unit) {
         for (Unit unit1 : getUnits(!unit.isWhite())) {
-            if (unit1.canMove(unit1.getPosition(), unit.getPosition(), this)) return true;
+            if (unit1.canMove(unit1.getPosition(), unit.getPosition(), this))
+                return true;
         }
 
         return false;
     }
 
     public boolean isUnitAtRisk(Unit unit, Position atPosition) {
-        for (Unit unit1 : getUnits(!unit.isWhite())) {
-            if (unit1.canMove(unit1.getPosition(), atPosition, this)) return true;
-        }
+        Position startPos = unit.getPosition();
+        unit.setPosition(atPosition);
 
-        return false;
+        boolean isAtRisk = isUnitAtRisk(unit);
+
+        unit.setPosition(startPos);
+        return isAtRisk;
     }
 
     public boolean isUnitAtRisk(Unit atRisk, Unit selectedUnit, Position atPosition) {
@@ -323,17 +327,17 @@ public class Game {
         return risking;
     }
 
-    public void addEaten(Unit eaten, boolean isWhite) {
-        if (isWhite) eatenWhite.add(eaten);
-        else eatenBlack.add(eaten);
+    public void addCaptured(Unit captured, boolean isWhite) {
+        if (isWhite) capturedWhite.add(captured);
+        else capturedBlack.add(captured);
     }
 
-    public ArrayList<Unit> getEaten(boolean white, boolean onlyUniques, boolean notPawnsOrKings) {
+    public ArrayList<Unit> getCaptured(boolean white, boolean onlyUniques, boolean notPawnsOrKings) {
         ArrayList<Unit> uniques = new ArrayList<>();
         ArrayList<Unit> units;
 
-        if (white) units = eatenWhite;
-        else units = eatenBlack;
+        if (white) units = capturedWhite;
+        else units = capturedBlack;
 
         for (Unit unit : units) {
             boolean unique = true;
@@ -350,16 +354,22 @@ public class Game {
         return uniques;
     }
 
-    public ArrayList<Unit> getEaten(boolean white, boolean onlyUniques) {
-        return getEaten(white, onlyUniques, false);
+    public ArrayList<Unit> getCaptured(boolean white, boolean onlyUniques) {
+        return getCaptured(white, onlyUniques, false);
     }
 
-    public ArrayList<Unit> getEaten(boolean white) {
+    public ArrayList<Unit> getCaptured(boolean white) {
         if (white) {
-            return eatenWhite;
+            return capturedWhite;
         }
 
-        return eatenBlack;
+        return capturedBlack;
+    }
+
+    public void captured(Unit unit) {
+        units.remove(unit);
+        addCaptured(unit, unit.isWhite());
+        Undo.addRemoved(unit);
     }
 
     //moving
@@ -385,9 +395,9 @@ public class Game {
                 else clicked = clicked.add(0, 1);
 
                 if (movingTo.isWhite()) {
-                    eatenWhite.add(movingTo);
+                    capturedWhite.add(movingTo);
                 } else {
-                    eatenBlack.add(movingTo);
+                    capturedBlack.add(movingTo);
                 }
 
                 Undo.moved(selected);
@@ -422,9 +432,9 @@ public class Game {
                     Undo.addRemoved(movingTo);
 
                     if (movingTo.isWhite()) {
-                        eatenWhite.add(movingTo);
+                        capturedWhite.add(movingTo);
                     } else {
-                        eatenBlack.add(movingTo);
+                        capturedBlack.add(movingTo);
                     }
                     units.remove(movingTo);
 
@@ -439,43 +449,48 @@ public class Game {
 
     public void changeTurn() {
 
-        if (multiPlayer) {
-            //is king at checkmate
-            boolean canMove = true;
+        //is king at checkmate
+        boolean canMove = true;
 
-            Unit king = getKing(!whitesTurn);
-            int[] x = {-1, 0, 1, -1, 1, -1, 0, 1};
-            int[] y = {1, 1, 1, 0, 0, -1, -1, -1};
-            for (int i = 0; i < 8; i++) {
-                Position endPos = king.getPosition().add(x[i], y[i]);
-                if (isOnBoard(endPos)) continue;
+        Unit king = getKing(!whitesTurn);
+        int[] x = {-1, 0, 1, -1, 1, -1, 0, 1};
+        int[] y = {1, 1, 1, 0, 0, -1, -1, -1};
+        for (int i = 0; i < 8; i++) {
+            Position endPos = king.getPosition().add(x[i], y[i]);
+            if (isOnBoard(endPos)) continue;
 
-                if (!isUnitAtRisk(king, endPos)) {
-                    if (hasUnitIn(endPos))
-                        if (getUnitOnPosition(endPos).isWhite() == king.isWhite()) continue;
-                    canMove = false;
-                }
+            if (!isUnitAtRisk(king, endPos)) {
+                if (hasUnitIn(endPos))
+                    if (getUnitOnPosition(endPos).isWhite() == king.isWhite()) continue;
+                canMove = false;
             }
+        }
 
-            if (canMove && selected != null) { // fixing npe when undoing
+
+        if (!multiPlayer) { //TODO: FIX UPGRADING IN SINGLE PLAYER
+            aI.makeMove(this);
+        } else {
+            whitesTurn = !whitesTurn;
+        }
+        if (selected != null) {
+            if (!canMove) { // fixing npe when undoing
                 if (isUnitAtRisk(king)) {
                     gameOver = true;
                     isWhiteWinner = whitesTurn;
-                    stopTimer();
+                    if (usingTimer) stopTimer();
+
                 } else {
                     if (getUnits(!selected.isWhite()).size() == 1) { //stalemate
                         gameOver = true;
-                        stopTimer();
+                        if (usingTimer) stopTimer();
                     }
                 }
             }
-
-            whitesTurn = !whitesTurn;
-        } else {
-            ai.makeMove(this);
         }
+
         selected = null;
         Chess.WINDOW.repaint();
+
     }
 
     public void unselect() {
@@ -485,7 +500,7 @@ public class Game {
     public void select(int x) {
         x /= SQUARE_SIZE;
 
-        ArrayList<Unit> possibles = getEaten(!isWhitesTurn(), true, true);
+        ArrayList<Unit> possibles = getCaptured(!isWhitesTurn(), true, true);
         chosen = possibles.get(x);
         choosingUnit = false;
 
@@ -515,21 +530,21 @@ public class Game {
         Undo.addRemoved(pawn);
 
         if (pawn.isWhite()) {
-            for (Unit unit : eatenWhite) {
+            for (Unit unit : capturedWhite) {
                 if (unit.getType() == to) {
                     unit.setPosition(pawn.getPosition());
                     units.add(unit);
-                    eatenWhite.remove(unit);
+                    capturedWhite.remove(unit);
                     Undo.addAdded(unit);
                     break;
                 }
             }
         } else {
-            for (Unit unit : eatenBlack) {
+            for (Unit unit : capturedBlack) {
                 if (unit.getType() == to) {
                     unit.setPosition(pawn.getPosition());
                     units.add(unit);
-                    eatenBlack.remove(unit);
+                    capturedBlack.remove(unit);
                     Undo.addAdded(unit);
                     break;
                 }
