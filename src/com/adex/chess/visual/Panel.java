@@ -94,7 +94,7 @@ public class Panel extends JPanel {
      */
     public void saveSettings() {
         settings.setUndos(undos.getValue()).setTime(time.getValue());
-        if (timer.getValue() == 0) settings.setTime(0);
+        settings.setTimer(timer.getValue() == 1);
         screenId = 0;
         repaint();
     }
@@ -438,7 +438,7 @@ public class Panel extends JPanel {
     }
 
     private void chooseUnit(Graphics g) {
-        ArrayList<Unit> possibles = game.getEaten(!game.isWhitesTurn(), true, true);
+        ArrayList<Unit> possibles = game.getCaptured(!game.isWhitesTurn(), true, true);
 
         if (possibles.size() == 0) {
             game.choosingUnit = false;
@@ -540,7 +540,7 @@ public class Panel extends JPanel {
                         game.select(x - selectionX);
                     }
                     break;
-                case 2:
+                case 2: //Settings
                     if (e.getButton() != MouseEvent.BUTTON1) return; // Was it clicked with left button
                     if (x >= startX && y >= startY && isOnValidY) { // In settings area
                         if (x <= startX + width) { // Clicked button
